@@ -46,7 +46,6 @@ contract Owned {
 }
 
 
-
 contract EternalStorage is Owned{
 
     mapping(bytes32 => uint) UIntStorage;
