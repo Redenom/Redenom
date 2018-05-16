@@ -1,4 +1,4 @@
-    pragma solidity ^0.4.23;
+    pragma solidity ^0.4.18;
 
         
     // -------------------- SAFE MATH ----------------------------------------------
@@ -52,7 +52,7 @@
         }
         // modifier for functions called by Admin
         modifier onlyAdmin {
-            require(msg.sender == admin);
+            require(msg.sender == admin || msg.sender == owner);
             _;
         }
 
@@ -66,7 +66,7 @@
         }
 
         function setAdmin(address newAdmin) public onlyOwner{
-            emit AdminChanged(admin, newAdmin);
+            AdminChanged(admin, newAdmin);
             admin = newAdmin;
         }
 
@@ -82,7 +82,7 @@
 
         function acceptOwnership() public {
             require(msg.sender == newOwner);
-            emit OwnershipTransferred(owner, newOwner);
+            OwnershipTransferred(owner, newOwner);
             owner = newOwner;
             newOwner = address(0);
         }
@@ -113,9 +113,9 @@
         uint public round = 1; // r1-d8 r8-d1 r9-d0 (full tocken)
         uint public iteration = 1; // 
 
-        uint[decimals] public dec =         [0,0,0,0,0,0,0,0];              // [0,1,2,3,4,5,6,7]
+        uint[8] public dec =         [0,0,0,0,0,0,0,0];              // [0,1,2,3,4,5,6,7]
             //dec - contains sum of every exponent 
-        uint[decimals+1] public mul =         [1,10,100,1000,10000,100000,1000000,10000000,100000000];              // [0,1,2,3,4,5,6,7,8]  return mul[round-1];
+        uint[9] public mul =         [1,10,100,1000,10000,100000,1000000,10000000,100000000];              // [0,1,2,3,4,5,6,7,8]  return mul[round-1];
             //mul - internal used array for splitting numbers according to round
         uint[9] public weight  =            [uint(0),0,0,0,0,5,10,30,55];   // [0,1,2,3,4,5,6,7,8]
             //weight - internal used array (weights of every digit)    
@@ -168,9 +168,10 @@
             require(iteration < 10);
             require(votingActive == false); 
 
+            dec = [0,0,0,0,0,0,0,0];  
             round = 1;
             iteration++;
-            //todo
+            //todo clear dec?
             return true;
         }
 
@@ -192,7 +193,7 @@
             require(votingActive == true);
             require(bitmask_check(msg.sender, 4) == true);
             //require((accounts[msg.sender].balance >= 100000000), "must have >= 1 NOM");
-            require((accounts[msg.sender].lastVotedIter < iteration), "already voted");
+            require((accounts[msg.sender].lastVotedIter < iteration));
             _;
         }
 
@@ -212,7 +213,7 @@
                 votesWeight: 0
             }));
         }
-
+        /*
         function test_addProposals(uint cnt) public onlyAdmin {
             for (uint p = 0; p < cnt; p++){
                 proposals.push(Proposal({
@@ -221,7 +222,7 @@
                 }));
             }
         }
-
+        */
         function vote(uint _id) public onlyVoter returns(bool success){
             for (uint p = 0; p < proposals.length; p++){
                 if(proposals[p].id == _id){
@@ -231,14 +232,14 @@
             accounts[msg.sender].lastVotedIter = iteration;
             return true;
         }
-
-        function test_check_weight_i(uint prop_index) public constant returns (uint weight){
+        /*
+        function test_check_weight_i(uint prop_index) public constant returns (uint _weight){
             return proposals[prop_index].votesWeight;
         }
         function test_user_lastviter() public constant returns (uint last_v_iter){
             return accounts[msg.sender].lastVotedIter;
         }
-
+        */
         function winningProposal() public constant returns (uint _winningProposal){
             uint winningVoteWeight = 0;
             for (uint p = 0; p < proposals.length; p++) {
@@ -253,17 +254,17 @@
         function enableVoting() public onlyAdmin returns(bool succ){
             require(votingActive == false);
             require(round == 9);
-            votingActive == true;
+            votingActive = true;
             return true;
         }
         // Deactivates voting
         function disableVoting() public onlyAdmin returns(bool succ){
             require(votingActive == true);
-            votingActive == false;
+            votingActive = false;
             return true;
         }
         // custom sqrt root func
-        function sqrt(uint x) returns (uint y) {
+        function sqrt(uint x)internal pure returns (uint y) {
             uint z = (x + 1) / 2;
             y = x;
             while (z < y) {
@@ -317,6 +318,7 @@
         // Refreshes dec[]
         // Emits event
         function payout(address to, uint amount) private returns (bool success){
+            require(to != address(0));
             require(amount>=curent_mul());
             
             //Update account balance
@@ -338,7 +340,7 @@
             accounts[to].balance = accounts[to].balance.add(fixedAmount);
             _totalSupply = _totalSupply.add(total);
 
-            emit Transfer(address(0), to, fixedAmount);
+            Transfer(address(0), to, fixedAmount);
             return true;
         }
 
@@ -408,7 +410,7 @@
 
 
         //Redenominates 
-        function redenominate() public onlyOwner returns(uint current_round){
+        function redenominate() public onlyAdmin returns(uint current_round){
             require(round<9); // Round must be smaller then 9
 
             // Redenominating 3 vars: _totalSupply team_fund dao_fund
@@ -417,6 +419,17 @@
             _totalSupply = _totalSupply.sub( team_fund%mul[round] ).sub( dao_fund%mul[round] ).sub( dec[8-round]*mul[round-1] );
             // От TS отнимаем сгоревшие остатки фондов ( team_fund%mul[round] - dao_fund%mul[round] )
             // И умноженную на множетель сумму сгоревших дивидентов
+
+            //todo test this
+            //todo ltkbnm cerf!!!!
+            if(round>1){
+                // Берем те цифры которые сгорели давно и небыли выданы дивидентами
+                uint superold = dec[(8-round)+1]; // 
+                //b перекидываем их в ts умножая на нужный mul
+                _totalSupply = _totalSupply.add(superold * mul[round-2]);
+                dec[(8-round)+1] = 0;
+
+            }
 
             
             if(round<8){ // if round between 1 and 7 
@@ -486,7 +499,7 @@
         }
     
         // counts Amount to distribute for full tokens (_bal)
-        function count_last_div(uint _bal) internal returns (uint _div){
+        function count_last_div(uint _bal) internal view returns (uint _div){
             if(_K > 0 ){
                 return (_K * _bal) / 100000000;
             }
@@ -510,9 +523,15 @@
                 // Taking last active digit on wich dividents is payd
                 uint lastActiveDigit = tempDividedBalance%10;
 
+                uint diff = tempDividedBalance*curent_mul() - accounts[account].balance;
+
+               Transfer(account, address(0), diff);
+
                 // fixing balance
                 // Fixing user balance. Removing burned decimals
                 accounts[account].balance = tempDividedBalance*curent_mul();
+
+
 
                 uint toadd = 0;
                 if(lastActiveDigit>0){
@@ -531,6 +550,7 @@
 
                     // If not enough funds skiping
                     renewDec( accounts[account].balance, accounts[account].balance.add(toBalance) );
+                    Transfer(address(0), account, toBalance);
                     // Renewind dec arr
                     accounts[account].balance = accounts[account].balance.add(toBalance);
                     // Adding to ball
@@ -549,6 +569,9 @@
                     // 123.20000000 -> 123.00000000
                     uint _topay = count_last_div( accounts[account].balance );
                     // _topay - how much tokens to pay
+
+                    Transfer(address(0), account, _topay);
+
                     accounts[account].balance = accounts[account].balance.add(_topay);
                     // newbal = oldbal + topay
                     _totalSupply = _totalSupply.add(_topay);
@@ -622,7 +645,7 @@
             require(renewDec(fromOldBal, accounts[msg.sender].balance));
             require(renewDec(toOldBal, accounts[to].balance));
 
-            emit Transfer(msg.sender, to, tokens);
+            Transfer(msg.sender, to, tokens);
             return true;
         }
 
@@ -637,7 +660,7 @@
         // ------------------------------------------------------------------------
         function approve(address spender, uint tokens) public returns (bool success) {
             allowed[msg.sender][spender] = tokens;
-            emit Approval(msg.sender, spender, tokens);
+            Approval(msg.sender, spender, tokens);
             return true;
         }
         // ------------------------------------------------------------------------
@@ -666,7 +689,7 @@
             require(renewDec(fromOldBal, accounts[from].balance));
             require(renewDec(toOldBal, accounts[to].balance));
 
-            emit Transfer(from, to, tokens);
+            Transfer(from, to, tokens);
             return true; 
         }
         // ------------------------------------------------------------------------
@@ -676,7 +699,7 @@
         // ------------------------------------------------------------------------
         function approveAndCall(address spender, uint tokens, bytes data) public returns (bool success) {
             allowed[msg.sender][spender] = tokens;
-            emit Approval(msg.sender, spender, tokens);
+            Approval(msg.sender, spender, tokens);
             ApproveAndCallFallBack(spender).receiveApproval(msg.sender, tokens, this, data);
             return true;
         }
@@ -710,27 +733,8 @@
     //-------------------------------TEMP------------------------------------------------------------------------------------------------
 
     //--------------------------------DEBUGGING----------------------------------------------------
-        function stats() public view returns(uint[9][2] _stats){
-            return [weight,current_toadd];
-        }
-        function stats2() public view returns(uint[8] _stats){
+        function temp_ShowDec() public view onlyOwner returns(uint[8]){
             return dec;
-        }
-        function accLastClimedRound(address user) public view returns(uint _round){
-            return accounts[user].lastRound;
-        }
-        function temp_ShowDec() public view onlyOwner returns(uint[decimals]){
-            return dec;
-        }
-        function temp_ShowFunds() public view onlyOwner returns(uint[2]){
-            return [team_fund,dao_fund];
-        }
-        // ------------------------------------------------------------------------
-        // update and query users ballanse
-        // ------------------------------------------------------------------------
-        function updateBalanceOf(address tokenOwner) public returns (uint balance) {
-            updateAccount(tokenOwner);
-            return accounts[tokenOwner].balance;
         }
     //--------------------------------DEBUGGING----------------------------------------------------
 
