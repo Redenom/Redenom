@@ -1,0 +1,23 @@
+{
+  "name": "redenom",
+  "version": "1.0.3",
+  "description": "truffle\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[C\u001b[D\u001b[B\u001b[A\u001b[DRe\u001b[2~denom truffle project",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Redenom/Redenom.git"
+  },
+  "keywords": [
+    "redenom",
+    "nom"
+  ],
+  "author": "redenom",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Redenom/Redenom/issues"
+  },
+  "homepage": "https://github.com/Redenom/Redenom#readme"
+}
