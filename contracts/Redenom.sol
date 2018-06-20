@@ -782,4 +782,4 @@ contract Redenom is ERC20Interface, Owned{
 
 
 
-} // Redenom by IG
+} // Redenom by Musqogee
