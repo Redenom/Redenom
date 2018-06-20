@@ -1,5 +1,4 @@
 pragma solidity ^0.4.18;
-
     
 // -------------------- SAFE MATH ----------------------------------------------
 library SafeMath {
@@ -118,7 +117,6 @@ contract Redenom is ERC20Interface, Owned{
         //weight - internal used array (weights of every digit)    
     uint[9] public current_toadd =      [uint(0),0,0,0,0,0,0,0,0];      // [0,0,0,0,0,0,0,1,2]
     //current_toadd - After redenominate() it holds an amount to ad on each digit.
-    uint _K; // coeff to count last divident on full tokens
 
 
     uint public total_fund; // All funds for all iterations 1 000 000 NOM
@@ -129,23 +127,30 @@ contract Redenom is ERC20Interface, Owned{
 
     struct Account {
         uint balance;
+        uint lastRound; // Last round user obtained dividents
+        uint lastVotedIter; // Last iteration user voted in
         uint bitmask; 
             // 2 - got 0.55... for phone verif.
             // 4 - got 1 for KYC
             // 1024 - banned
-            // 8 16 32 64 128 256 512 1024 - may be used
-        uint lastRound; // Last round user obtained dividents
-        uint lastVotedIter; // Last iteration user voted in
+            //
+            // [2] [4] 8 16 32 64 128 256 512 [1024] ... - free to use
     }
     
     mapping(address=>Account) accounts; 
     mapping(address => mapping(address => uint)) allowed;
 
+    //Redenom special events
+    event Redenomination(uint indexed round);
+    event Iteration(uint indexed iteration);
+    event VotingOn(address indexed initiator);
+    event VotingOff(address indexed initiator);
+    event Vote(address indexed voter, uint indexed propId, uint indexed voterBalance);
 
     function Redenom() public {
         symbol = "NOM";
         name = "Redenom";
-        _totalSupply = 0; // total funds in the game 
+        _totalSupply = 0; // total NOM's in the game 
 
         total_fund = 1000000 * 10**decimals; // 1 000 000.00000000, 1Mt
         iter_fund = 100000 * 10**decimals; // 100 000.00000000, 100 Kt
@@ -174,6 +179,7 @@ contract Redenom is ERC20Interface, Owned{
 
         delete proposals;
 
+        emit Iteration(iteration);
         return true;
     }
 
@@ -185,10 +191,11 @@ contract Redenom is ERC20Interface, Owned{
     //Is voting active?
     bool public votingActive = false;
 
-    // Voter must be:
+    // Voter has to:
     // - Not voted in this iteration
+    // - Is not banned
     // - Approved KYC (bitmask 4)
-    // - (NO) Has >= 1 NOM
+    // - (OFF) Has >= 1 NOM
     modifier onlyVoter {
         require(votingActive == true);
         require(bitmask_check(msg.sender, 4) == true); //Approved KYC
@@ -202,13 +209,14 @@ contract Redenom is ERC20Interface, Owned{
     // This is a type for a single proposal.
     struct Proposal {
         uint id;   // Proposal id
-        uint votesWeight; // number of accumulated votes weights
+        uint votesWeight; // number of total votes weights
         bool active; //is the proposal active.
     }
+
     // A dynamically-sized array of `Proposal` structs.
     Proposal[] public proposals;
 
-
+    // Add prop. with id: _id
     function addProposal(uint _id) public onlyAdmin {
         proposals.push(Proposal({
             id: _id,
@@ -217,18 +225,20 @@ contract Redenom is ERC20Interface, Owned{
         }));
     }
 
-    function swapProposal(uint _id) public onlyAdmin {
+    // Turns proposal ON and OFF
+    function swapProposal(uint _id) public onlyAdmin {//TODO view??
         for (uint p = 0; p < proposals.length; p++){
             if(proposals[p].id == _id){
                 if(proposals[p].active == true){
-                    proposals[p].active == false;
+                    proposals[p].active = false;
                 }else{
-                    proposals[p].active == true;
+                    proposals[p].active = true;
                 }
             }
         }
     }
 
+    // Returns prop. weight
     function proposalWeight(uint _id) public constant returns(uint PW){
         for (uint p = 0; p < proposals.length; p++){
             if(proposals[p].id == _id){
@@ -236,6 +246,8 @@ contract Redenom is ERC20Interface, Owned{
             }
         }
     }
+
+    // Returns prop. status
     function proposalActive(uint _id) public constant returns(bool PA){
         for (uint p = 0; p < proposals.length; p++){
             if(proposals[p].id == _id){
@@ -244,6 +256,7 @@ contract Redenom is ERC20Interface, Owned{
         }
     }
 
+    // Vote for prop. with id: _id
     function vote(uint _id) public onlyVoter returns(bool success){
         //todo updateAccount
         for (uint p = 0; p < proposals.length; p++){
@@ -252,9 +265,11 @@ contract Redenom is ERC20Interface, Owned{
                 accounts[msg.sender].lastVotedIter = iteration;
             }
         }
+        emit Vote(msg.sender, _id, accounts[msg.sender].balance);
         return true;
     }
 
+    // Shows currently winning prop 
     function winningProposal() public constant returns (uint _winningProposal){
         uint winningVoteWeight = 0;
         for (uint p = 0; p < proposals.length; p++) {
@@ -264,21 +279,30 @@ contract Redenom is ERC20Interface, Owned{
             }
         }
     }
+
     // Activates voting
     // requires round = 9
     function enableVoting() public onlyAdmin returns(bool succ){ 
         require(votingActive == false);
         require(round == 9);
         votingActive = true;
+
+        emit VotingOn(msg.sender);
         return true;
+
+
     }
+
     // Deactivates voting
     function disableVoting() public onlyAdmin returns(bool succ){
         require(votingActive == true);
         votingActive = false;
+
+        emit VotingOff(msg.sender);
         return true;
     }
-    // custom sqrt root func
+
+    // sqrt root func
     function sqrt(uint x)internal pure returns (uint y) {
         uint z = (x + 1) / 2;
         y = x;
@@ -292,9 +316,21 @@ contract Redenom is ERC20Interface, Owned{
 
 
 
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////
     // NOM token emission functions
     ///////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    // Pays 1.00000000 from iter_fund to KYC user
+    // Uses payout(), bitmask_check(), bitmask_add()
+    // adds 4 to bitmask
+    function pay1(address to) public onlyAdmin returns(bool success){
+        require(bitmask_check(to, 4) == false);
+        uint new_amount = 100000000;
+        payout(to,new_amount);
+        bitmask_add(to, 4);
+        return true;
+    }
 
     // Pays .555666XX from iter_fund to user approved phone;
     // Uses payout(), bitmask_check(), bitmask_add()
@@ -307,24 +343,14 @@ contract Redenom is ERC20Interface, Owned{
         return true;
     }
 
-    // Pays .555666XX from iter_fund to user approved phone;
+    // Pays .555666XX from iter_fund to KYC user in new epoch;
     // Uses payout(), bitmask_check(), bitmask_add()
     // adds 2 to bitmask
     function pay055loyal(address to) public onlyAdmin returns(bool success){
         require(iteration > 1);
+        require(bitmask_check(to, 4) == true);
         uint new_amount = 55566600 + (block.timestamp%100);       
         payout(to,new_amount);
-        return true;
-    }
-
-    // Pays 1.00000000 from iter_fund to KYC user
-    // Uses payout(), bitmask_check(), bitmask_add()
-    // adds 4 to bitmask
-    function pay1(address to) public onlyAdmin returns(bool success){
-        require(bitmask_check(to, 4) == false);
-        uint new_amount = 100000000;
-        payout(to,new_amount);
-        bitmask_add(to, 4);
         return true;
     }
 
@@ -391,8 +417,6 @@ contract Redenom is ERC20Interface, Owned{
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    
-
 
     // Run this on every change of user ballance
     // Refreshes dec[] array
@@ -400,28 +424,33 @@ contract Redenom is ERC20Interface, Owned{
     // while transaction must be called for each acc.
     function renewDec(uint initSum, uint newSum) internal returns(bool success){
 
-        uint tempInitSum = initSum; 
-        uint tempNewSum = newSum; 
-        uint cnt = 1;
+        if(round < 9){
+            uint tempInitSum = initSum; 
+            uint tempNewSum = newSum; 
+            uint cnt = 1;
 
-        while( (tempNewSum > 0 || tempInitSum > 0) && cnt <= decimals ){
+            while( (tempNewSum > 0 || tempInitSum > 0) && cnt <= decimals ){
 
-            uint lastInitSum = tempInitSum%10; // 0.0000000 (0)
-            tempInitSum = tempInitSum/10; // (0.0000000) 0
+                uint lastInitSum = tempInitSum%10; // 0.0000000 (0)
+                tempInitSum = tempInitSum/10; // (0.0000000) 0
 
-            uint lastNewSum = tempNewSum%10; // 1.5556664 (5)
-            tempNewSum = tempNewSum/10; // (1.5556664) 5
+                uint lastNewSum = tempNewSum%10; // 1.5556664 (5)
+                tempNewSum = tempNewSum/10; // (1.5556664) 5
 
-            if(lastNewSum >= lastInitSum){
-                // If new is bigger
-                dec[decimals-cnt] = dec[decimals-cnt].add(lastNewSum - lastInitSum);
-                // 
-            }else{
-                // If new is smaller
-                dec[decimals-cnt] =  dec[decimals-cnt].sub(lastInitSum - lastNewSum);
+                if(cnt >= round){
+                    if(lastNewSum >= lastInitSum){
+                        // If new is bigger
+                        dec[decimals-cnt] = dec[decimals-cnt].add(lastNewSum - lastInitSum);
+                    }else{
+                        // If new is smaller
+                        dec[decimals-cnt] = dec[decimals-cnt].sub(lastInitSum - lastNewSum);
+                    }
+                }
+
+                cnt = cnt+1;
             }
-            cnt = cnt+1;
-        }
+        }//if(round < 9){
+
         return true;
     }
 
@@ -471,7 +500,7 @@ contract Redenom is ERC20Interface, Owned{
 
     //Redenominates 
     function redenominate() public onlyAdmin returns(uint current_round){
-        require(round<9); // Round must be smaller then 9
+        require(round<9); // Round must be < 9
 
         // Deleting funds rest from TS
         _totalSupply = _totalSupply.sub( team_fund%mul[round] ).sub( dao_fund%mul[round] ).sub( dec[8-round]*mul[round-1] );
@@ -480,16 +509,12 @@ contract Redenom is ERC20Interface, Owned{
         _totalSupply = ( _totalSupply / mul[round] ) * mul[round];
         team_fund = ( team_fund / mul[round] ) * mul[round]; // Redenominates team_fund
         dao_fund = ( dao_fund / mul[round] ) * mul[round]; // Redenominates dao_fund
-        // От TS отнимаем сгоревшие остатки фондов ( team_fund%mul[round] - dao_fund%mul[round] )
-        // И умноженную на множетель сумму сгоревших дивидентов
 
-        //todo test this
-        //todo ltkbnm cerf!!!!
         if(round>1){
-            // Берем те цифры которые сгорели давно и небыли выданы дивидентами
-            uint superold = dec[(8-round)+1]; // 
-            // и перекидываем их в IF умножая на нужный mul
-            // возвращаем их в выдаваемые.
+            // Taking decimals burned in last round and not distributed
+            uint superold = dec[(8-round)+1]; 
+
+            // Returning them to iter_fund
             iter_fund = iter_fund.add(superold * mul[round-2]);
             dec[(8-round)+1] = 0;
         }
@@ -511,7 +536,6 @@ contract Redenom is ERC20Interface, Owned{
                 round++;
                 return round;
             }
-
 
             // Counting amounts to add on all digits
             uint[9] memory numbers  =[uint(1),2,3,4,5,6,7,8,9]; // 
@@ -535,114 +559,88 @@ contract Redenom is ERC20Interface, Owned{
                 
         }else{
             if(round==8){
-                // round=8 
-                // last redinomination, basis is full tokens.
-                // on the end of this func round becomes 9
-                
-                // Un - unclimed dec
-                // Tt = total tokens;
-                //uint _K = (Un * 100000000) / Tt; // un*e8
-                //uint _divident = (_K * _ball) / 100000000;
-                //uint totalTokens = _totalSupply.sub(dao_fund).sub(team_fund);
-
-                _K = (dec[0] * 100000000) / _totalSupply.sub(dao_fund).sub(team_fund);
-
-                //Calculatinf coeff for last dividents payout\
-                //then using it in updateAccount()
+                // Returns last burned decimals to iter_fund
+                iter_fund = iter_fund.add(dec[0] * 10000000); //1e7
+                dec[0] = 0;
             }
-            
-            //total_current = total - sum(dec) ? dec(-1)
             
         }
 
         round++;
+        emit Redenomination(round);
         return round;
     }
 
-    // counts Amount to distribute for full tokens (_bal)
-    function count_last_div(uint _bal) internal view returns (uint _div){
-        if(_K > 0 ){
-            return (_K * _bal) / 100000000;
-        }
-    }
-
+   
     // Refresh user acc
     // Pays dividents if any
     function updateAccount(address account) public returns(uint new_balance){
-        require(round<=9 && round > accounts[account].lastRound);
+        require(round<=9);
         require(bitmask_check(account, 1024) == false); // banned == false
 
-        if(round >1 && round <=8){
+        if(round > accounts[account].lastRound){
+
+            if(round >1 && round <=8){
 
 
+                // Splits user bal by curent multiplier
+                uint tempDividedBalance = accounts[account].balance/curent_mul();
+                // [1.5556663] 4  (r2)
+                uint newFixedBallance = tempDividedBalance*curent_mul();
+                // [1.55566630]  (r2)
+                uint lastActiveDigit = tempDividedBalance%10;
+                 // 1.555666 [3] 4  (r2)
+                uint diff = accounts[account].balance - newFixedBallance;
+                // 1.5556663 [4] (r2)
 
-            // dividing balance curent mult.
-            // Splits user bal on curent multiplier
-            uint tempDividedBalance = accounts[account].balance/curent_mul();
+                if(diff > 0){
+                    accounts[account].balance = newFixedBallance;
+                    emit Transfer(account, address(0), diff);
+                }
 
-            // taking last active digit (destribution basis)
-            // Taking last active digit on wich dividents is payd
-            uint lastActiveDigit = tempDividedBalance%10;
-
-            uint diff = tempDividedBalance*curent_mul() - accounts[account].balance;
-
-           emit Transfer(account, address(0), diff);
-
-            // fixing balance
-            // Fixing user balance. Removing burned decimals
-            accounts[account].balance = tempDividedBalance*curent_mul();
-
-
-
-            uint toadd = 0;
-            if(lastActiveDigit>0){
-                toadd = current_toadd[lastActiveDigit-1];
-                // Taking amunt to add in current_toadd
-            }
-
-            //Amount to ad to ball
-            uint toBalance = toadd * curent_mul();
+                uint toBalance = 0;
+                if(lastActiveDigit>0 && current_toadd[lastActiveDigit-1]>0){
+                    toBalance = current_toadd[lastActiveDigit-1] * curent_mul();
+                }
 
 
-            if(toBalance < dec[8-round+1]){ // There where situations when funds not enough todo ?
+                if(toBalance > 0 && toBalance < dec[8-round+1]){ // Not enough
 
-                _totalSupply = _totalSupply.add(toBalance);
-                // Add divident to _totalSupply
+                    renewDec( accounts[account].balance, accounts[account].balance.add(toBalance) );
+                    emit Transfer(address(0), account, toBalance);
+                    // Renewind dec arr
+                    accounts[account].balance = accounts[account].balance.add(toBalance);
+                    // Adding to ball
+                    dec[8-round+1] = dec[8-round+1].sub(toBalance);
+                    // Taking from burned decimal
+                    _totalSupply = _totalSupply.add(toBalance);
+                    // Add divident to _totalSupply
+                }
 
-                // If not enough funds skiping
-                renewDec( accounts[account].balance, accounts[account].balance.add(toBalance) );
-                emit Transfer(address(0), account, toBalance);
-                // Renewind dec arr
-                accounts[account].balance = accounts[account].balance.add(toBalance);
-                // Adding to ball
-                dec[8-round+1] = dec[8-round+1].sub(toBalance);
-                // Taking from burned decimal
-            }
+                accounts[account].lastRound = round;
+                // Writting last round in wich user got dividents
+                return accounts[account].balance;
+                // returns new ballance
+            }else{
+                if( round == 9){ //100000000 = 9 mul (mul8)
 
-            accounts[account].lastRound = round;
-            // Writting last round in wich user got dividents
-            return accounts[account].balance;
-            // returns new ballance
-        }else{
-            if( round == 9){ //100000000 = 9 mul (mul8)
+                    uint newBalance = fix_amount(accounts[account].balance);
+                    uint _diff = accounts[account].balance.sub(newBalance);
 
-                renewDec( accounts[account].balance, fix_amount(accounts[account].balance) );
-                accounts[account].balance = fix_amount(accounts[account].balance);
-                // 123.20000000 -> 123.00000000
-                uint _topay = count_last_div( accounts[account].balance );
-                // _topay - how much tokens to pay
+                    if(_diff > 0){
+                        renewDec( accounts[account].balance, newBalance );
+                        accounts[account].balance = newBalance;
+                        emit Transfer(account, address(0), _diff);
+                    }
 
-
-                emit Transfer(address(0), account, _topay);
-
-                accounts[account].balance = accounts[account].balance.add(_topay);
-                // newbal = oldbal + topay
-                _totalSupply = _totalSupply.add(_topay);
-
+                    accounts[account].lastRound = round;
+                    // Writting last round in wich user got dividents
+                    return accounts[account].balance;
+                    // returns new ballance
+                }
             }
         }
     }
-
 
     // Returns curent multipl. based on round
     // Returns curent multiplier based on round
@@ -784,9 +782,4 @@ contract Redenom is ERC20Interface, Owned{
 
 
 
-
-
-
-
-
-}
+} // Redenom by IG
