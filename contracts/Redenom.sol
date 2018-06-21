@@ -154,7 +154,7 @@ contract Redenom is ERC20Interface, Owned{
 
         total_fund = 1000000 * 10**decimals; // 1 000 000.00000000, 1Mt
         epoch_fund = 100000 * 10**decimals; // 100 000.00000000, 100 Kt
-        total_fund = total_fund.sub(epoch_fund); // Taking 100 Kt from total to iteration fund
+        total_fund = total_fund.sub(epoch_fund); // Taking 100 Kt from total to epoch fund
 
     }
 
@@ -179,7 +179,7 @@ contract Redenom is ERC20Interface, Owned{
 
         delete proposals;
 
-        emit Iteration(epoch);
+        emit Epoch(epoch);
         return true;
     }
 
