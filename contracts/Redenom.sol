@@ -101,7 +101,7 @@ contract Redenom is ERC20Interface, Owned{
     //ERC20 params
     string      public name; // ERC20 
     string      public symbol; // ERC20 
-    uint        public _totalSupply; // ERC20
+    uint        private _totalSupply; // ERC20
     uint        public decimals = 8; // ERC20 
 
 
@@ -177,7 +177,7 @@ contract Redenom is ERC20Interface, Owned{
         epoch_fund = 100000 * 10**decimals; // 100 000.00000000, 100 Kt
         total_fund = total_fund.sub(epoch_fund); // Taking 100 Kt from total to epoch fund
 
-        delete proposals;
+        delete projects;
 
         emit Epoch(epoch);
         return true;
@@ -206,33 +206,33 @@ contract Redenom is ERC20Interface, Owned{
     }
 
 
-    // This is a type for a single proposal.
-    struct Proposal {
-        uint id;   // Proposal id
+    // This is a type for a single Project.
+    struct Project {
+        uint id;   // Project id
         uint votesWeight; // number of total votes weights
-        bool active; //is the proposal active.
+        bool active; //is the Project active.
     }
 
-    // A dynamically-sized array of `Proposal` structs.
-    Proposal[] public proposals;
+    // A dynamically-sized array of `Project` structs.
+    Project[] public projects;
 
     // Add prop. with id: _id
-    function addProposal(uint _id) public onlyAdmin {
-        proposals.push(Proposal({
+    function addProject(uint _id) public onlyAdmin {
+        projects.push(Project({
             id: _id,
             votesWeight: 0,
             active: true
         }));
     }
 
-    // Turns proposal ON and OFF
-    function swapProject(uint _id) public onlyAdmin {//TODO view??
-        for (uint p = 0; p < proposals.length; p++){
-            if(proposals[p].id == _id){
-                if(proposals[p].active == true){
-                    proposals[p].active = false;
+    // Turns Project ON and OFF
+    function swapProject(uint _id) public onlyAdmin {
+        for (uint p = 0; p < projects.length; p++){
+            if(projects[p].id == _id){
+                if(projects[p].active == true){
+                    projects[p].active = false;
                 }else{
-                    proposals[p].active = true;
+                    projects[p].active = true;
                 }
             }
         }
@@ -240,18 +240,18 @@ contract Redenom is ERC20Interface, Owned{
 
     // Returns prop. weight
     function projectWeight(uint _id) public constant returns(uint PW){
-        for (uint p = 0; p < proposals.length; p++){
-            if(proposals[p].id == _id){
-                return proposals[p].votesWeight;
+        for (uint p = 0; p < projects.length; p++){
+            if(projects[p].id == _id){
+                return projects[p].votesWeight;
             }
         }
     }
 
     // Returns prop. status
     function projectActive(uint _id) public constant returns(bool PA){
-        for (uint p = 0; p < proposals.length; p++){
-            if(proposals[p].id == _id){
-                return proposals[p].active;
+        for (uint p = 0; p < projects.length; p++){
+            if(projects[p].id == _id){
+                return projects[p].active;
             }
         }
     }
@@ -259,9 +259,9 @@ contract Redenom is ERC20Interface, Owned{
     // Vote for prop. with id: _id
     function vote(uint _id) public onlyVoter returns(bool success){
         //todo updateAccount
-        for (uint p = 0; p < proposals.length; p++){
-            if(proposals[p].id == _id && proposals[p].active == true){
-                proposals[p].votesWeight += sqrt(accounts[msg.sender].balance);
+        for (uint p = 0; p < projects.length; p++){
+            if(projects[p].id == _id && projects[p].active == true){
+                projects[p].votesWeight += sqrt(accounts[msg.sender].balance);
                 accounts[msg.sender].lastVotedIter = epoch;
             }
         }
@@ -270,12 +270,12 @@ contract Redenom is ERC20Interface, Owned{
     }
 
     // Shows currently winning prop 
-    function winningProject() public constant returns (uint _winningProposal){
+    function winningProject() public constant returns (uint _winningProject){
         uint winningVoteWeight = 0;
-        for (uint p = 0; p < proposals.length; p++) {
-            if (proposals[p].votesWeight > winningVoteWeight && proposals[p].active == true) {
-                winningVoteWeight = proposals[p].votesWeight;
-                _winningProposal = proposals[p].id;
+        for (uint p = 0; p < projects.length; p++) {
+            if (projects[p].votesWeight > winningVoteWeight && projects[p].active == true) {
+                winningVoteWeight = projects[p].votesWeight;
+                _winningProject = projects[p].id;
             }
         }
     }
