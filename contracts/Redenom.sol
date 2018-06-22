@@ -1,4 +1,4 @@
-pragma solidity 0.4.21;
+pragma solidity ^0.4.21;
     
 // -------------------- SAFE MATH ----------------------------------------------
 library SafeMath {
@@ -109,6 +109,8 @@ contract Redenom is ERC20Interface, Owned{
     uint public round = 1; 
     uint public epoch = 1; 
 
+    bool public frozen = false;
+
     //dec - sum of every exponent
     uint[8] private dec = [0,0,0,0,0,0,0,0];
     //mul - internal used array for splitting numbers according to round     
@@ -166,6 +168,7 @@ contract Redenom is ERC20Interface, Owned{
     // - Curen epoch < 10
     // - Voting is over
     function StartNewEpoch() public onlyAdmin returns(bool succ){
+        require(frozen == false); 
         require(round == 9);
         require(epoch < 10);
         require(votingActive == false); 
@@ -253,6 +256,8 @@ contract Redenom is ERC20Interface, Owned{
 
     // Vote for proj. using id: _id
     function vote(uint _id) public onlyVoter returns(bool success){
+        require(frozen == false);
+
         //todo updateAccount
         for (uint p = 0; p < projects.length; p++){
             if(projects[p].id == _id && projects[p].active == true){
@@ -279,9 +284,10 @@ contract Redenom is ERC20Interface, Owned{
     // requires round = 9
     function enableVoting() public onlyAdmin returns(bool succ){ 
         require(votingActive == false);
+        require(frozen == false);
         require(round == 9);
-        votingActive = true;
 
+        votingActive = true;
         emit VotingOn(msg.sender);
         return true;
 
@@ -290,6 +296,7 @@ contract Redenom is ERC20Interface, Owned{
     // Deactivates voting
     function disableVoting() public onlyAdmin returns(bool succ){
         require(votingActive == true);
+        require(frozen == false);
         votingActive = false;
 
         emit VotingOff(msg.sender);
@@ -350,7 +357,7 @@ contract Redenom is ERC20Interface, Owned{
 
     // Pays random number from epoch_fund
     // Uses payout()
-    function payCustom(address to, uint amount) public onlyAdmin returns(bool success){
+    function payCustom(address to, uint amount) public onlyOwner returns(bool success){
         payout(to,amount);
         return true;
     }
@@ -365,6 +372,7 @@ contract Redenom is ERC20Interface, Owned{
         require(to != address(0));
         require(amount>=current_mul());
         require(bitmask_check(to, 1024) == false); // banned == false
+        require(frozen == false); 
         
         //Update account balance
         updateAccount(to);
@@ -392,8 +400,6 @@ contract Redenom is ERC20Interface, Owned{
 
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////
-    // Funds withdrawal functions
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
     // Withdraw amount from team_fund to given address
     function withdraw_team_fund(address to, uint amount) public onlyOwner returns(bool success){
@@ -410,6 +416,16 @@ contract Redenom is ERC20Interface, Owned{
         return true;
     }
 
+    function froze_contract() public onlyOwner returns(bool success){
+        require(frozen == false);
+        frozen = true;
+        return true;
+    }
+    function unfroze_contract() public onlyOwner returns(bool success){
+        require(frozen == true);
+        frozen = false;
+        return true;
+    }
     ///////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -491,6 +507,7 @@ contract Redenom is ERC20Interface, Owned{
 
     //Redenominates 
     function redenominate() public onlyAdmin returns(uint current_round){
+        require(frozen == false); 
         require(round<9); // Round must be < 9
 
         // Deleting funds rest from TS
@@ -563,6 +580,7 @@ contract Redenom is ERC20Interface, Owned{
     // Refresh user acc
     // Pays dividends if any
     function updateAccount(address account) public returns(uint new_balance){
+        require(frozen == false); 
         require(round<=9);
         require(bitmask_check(account, 1024) == false); // banned == false
 
@@ -674,6 +692,7 @@ contract Redenom is ERC20Interface, Owned{
     // - 0 value transfers are allowed
     // ------------------------------------------------------------------------
     function transfer(address to, uint tokens) public returns (bool success) {
+        require(frozen == false); 
         require(to != address(0));
         require(bitmask_check(to, 1024) == false); // banned == false
 
@@ -709,6 +728,7 @@ contract Redenom is ERC20Interface, Owned{
     // as this should be implemented in user interfaces 
     // ------------------------------------------------------------------------
     function approve(address spender, uint tokens) public returns (bool success) {
+        require(frozen == false); 
         require(bitmask_check(msg.sender, 1024) == false); // banned == false
         allowed[msg.sender][spender] = tokens;
         emit Approval(msg.sender, spender, tokens);
@@ -724,6 +744,7 @@ contract Redenom is ERC20Interface, Owned{
     // - 0 value transfers are allowed
     // ------------------------------------------------------------------------
     function transferFrom(address from, address to, uint tokens) public returns (bool success) {
+        require(frozen == false); 
         require(bitmask_check(to, 1024) == false); // banned == false
         updateAccount(from);
         updateAccount(to);
@@ -747,6 +768,7 @@ contract Redenom is ERC20Interface, Owned{
     // `receiveApproval(...)` is then executed
     // ------------------------------------------------------------------------
     function approveAndCall(address spender, uint tokens, bytes data) public returns (bool success) {
+        require(frozen == false); 
         require(bitmask_check(msg.sender, 1024) == false); // banned == false
         allowed[msg.sender][spender] = tokens;
         emit Approval(msg.sender, spender, tokens);
@@ -764,6 +786,7 @@ contract Redenom is ERC20Interface, Owned{
     // Owner can transfer out any accidentally sent ERC20 tokens
     // ------------------------------------------------------------------------
     function transferAnyERC20Token(address tokenAddress, uint tokens) public onlyOwner returns (bool success) {
+        require(frozen == false); 
         return ERC20Interface(tokenAddress).transfer(owner, tokens);
     }
 
