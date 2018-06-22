@@ -19,5 +19,8 @@
   "bugs": {
     "url": "https://github.com/Redenom/Redenom/issues"
   },
-  "homepage": "https://github.com/Redenom/Redenom#readme"
+  "homepage": "https://github.com/Redenom/Redenom#readme",
+  "dependencies": {
+    "solc": "0.4.24"
+  }
 }
