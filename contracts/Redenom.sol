@@ -416,12 +416,12 @@ contract Redenom is ERC20Interface, Owned{
         return true;
     }
 
-    function froze_contract() public onlyOwner returns(bool success){
+    function freeze_contract() public onlyOwner returns(bool success){
         require(frozen == false);
         frozen = true;
         return true;
     }
-    function unfroze_contract() public onlyOwner returns(bool success){
+    function unfreeze_contract() public onlyOwner returns(bool success){
         require(frozen == true);
         frozen = false;
         return true;
