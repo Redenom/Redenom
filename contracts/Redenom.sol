@@ -1,4 +1,7 @@
 pragma solidity ^0.4.21;
+// The GNU General Public License v3
+// © Musqogees Tech 2018, Redenom ™
+
     
 // -------------------- SAFE MATH ----------------------------------------------
 library SafeMath {
@@ -147,7 +150,7 @@ contract Redenom is ERC20Interface, Owned{
     event Epoch(uint indexed epoch);
     event VotingOn(address indexed initiator);
     event VotingOff(address indexed initiator);
-    event Vote(address indexed voter, uint indexed propId, uint indexed voterBalance);
+    event Vote(address indexed voter, uint indexed propId, uint indexed voterBalance, uint indexed voteEpoch);
 
     function Redenom() public {
         symbol = "NOM";
@@ -265,7 +268,8 @@ contract Redenom is ERC20Interface, Owned{
                 accounts[msg.sender].lastVotedEpoch = epoch;
             }
         }
-        emit Vote(msg.sender, _id, accounts[msg.sender].balance);
+        emit Vote(msg.sender, _id, accounts[msg.sender].balance, epoch);
+
         return true;
     }
 
@@ -793,4 +797,4 @@ contract Redenom is ERC20Interface, Owned{
 
 
 
-} // Redenom by Musqogee
+} // © Musqogees Tech 2018, Redenom ™
