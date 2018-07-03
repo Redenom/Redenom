@@ -133,6 +133,7 @@ contract Redenom is ERC20Interface, Owned{
     struct Account {
         uint balance;
         uint lastRound; // Last round dividens paid
+        uint lastEpoch; // Last round dividens paid
         uint lastVotedBallotId; // Last ballot user voted
         uint bitmask;
             // 2 - got 0.55... for phone verif.
@@ -157,7 +158,7 @@ contract Redenom is ERC20Interface, Owned{
         name = "Redenom_test";
         _totalSupply = 0; // total NOM's in the game 
 
-        total_fund = 100000000 * 10**decimals; // 100 000 000.00000000, 1Mt
+        total_fund = 10000000 * 10**decimals; // 100 000 00.00000000, 1Mt
         epoch_fund = 100000 * 10**decimals; // 100 000.00000000, 100 Kt
         total_fund = total_fund.sub(epoch_fund); // Taking 100 Kt from total to epoch_fund
 
@@ -614,6 +615,12 @@ contract Redenom is ERC20Interface, Owned{
         require(round<=9);
         require(bitmask_check(account, 1024) == false); // banned == false
 
+        if(accounts[account].lastEpoch < epoch){
+            uint entire = accounts[account].balance/100000000;
+            accounts[account].balance = entire*100000000;
+            return accounts[account].balance;
+        }
+
         if(round > accounts[account].lastRound){
 
             if(round >1 && round <=8){
@@ -655,6 +662,11 @@ contract Redenom is ERC20Interface, Owned{
 
                 accounts[account].lastRound = round;
                 // Writting last round in wich user got dividends
+                if(accounts[account].lastEpoch != epoch){
+                    accounts[account].lastEpoch = epoch;
+                }
+
+
                 return accounts[account].balance;
                 // returns new balance
             }else{
@@ -671,6 +683,11 @@ contract Redenom is ERC20Interface, Owned{
 
                     accounts[account].lastRound = round;
                     // Writting last round in wich user got dividends
+                    if(accounts[account].lastEpoch != epoch){
+                        accounts[account].lastEpoch = epoch;
+                    }
+
+
                     return accounts[account].balance;
                     // returns new balance
                 }
