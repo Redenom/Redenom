@@ -2,6 +2,14 @@ var fs = require("fs");
 var solc = require('solc'); //v0.4.24+commit.e67f0147
 
 
+
+
+/*
+var output = solc.compile({ sources: input }, 1)
+for (var contractName in output.contracts)
+	console.log(contractName + ': ' + output.contracts[contractName].bytecode)
+*/
+
 fs.readFile("contracts/Redenom.sol", "utf8", function(err, data) {
 	if(!err){
 
@@ -12,10 +20,17 @@ fs.readFile("contracts/Redenom.sol", "utf8", function(err, data) {
 
 		//console.log(data);
 
+
 		try{
 			var output = solc.compile({ sources: input }, 1);
 
-			console.log(output)
+			/* // debuging metadata
+			fs.writeFile("solc/"+ Date.now() +"_debug_data.txt", JSON.stringify(output), function(err) {
+			    if(err) {
+			        return console.log(err);
+			    }
+			}); */
+
 
 			for (var contractName in output.contracts){
 				console.log('------------------ ' + contractName + ' ------------------------');
@@ -23,10 +38,19 @@ fs.readFile("contracts/Redenom.sol", "utf8", function(err, data) {
 				console.log('------------------ /' + contractName + ' ------------------------');
 
 				cname = contractName.replace(":","_");
-				fname = "solc/bin/" + Date.now() + "_" + cname + '.txt';
+				bfname = "solc/bin/" + Date.now() + "_" + cname + '_bytecode.txt';
 				bytec = output.contracts[contractName].bytecode;
 
-				fs.writeFile(fname, bytec, function(err) {
+				fs.writeFile(bfname, bytec, function(err) {
+				    if(err) {
+				        return console.log(err);
+				    }
+				}); 
+
+				afname = "solc/bin/" + Date.now() + "_" + cname + '_ABI.txt';
+				abi = output.contracts[contractName].interface;
+
+				fs.writeFile(afname, abi, function(err) {
 				    if(err) {
 				        return console.log(err);
 				    }
