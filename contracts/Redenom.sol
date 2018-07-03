@@ -607,6 +607,14 @@ contract Redenom is ERC20Interface, Owned{
         return round;
     }
 
+
+    function actual_ballance(address user) public constant returns(uint actual_balance){
+        if(epoch > 1 && accounts[user].lastEpoch < epoch){
+            return (accounts[user].balance/100000000)*100000000;
+        }else{
+            return (accounts[user].balance/current_mul())*current_mul();
+        }
+    }
    
     // Refresh user acc
     // Pays dividends if any
@@ -615,7 +623,7 @@ contract Redenom is ERC20Interface, Owned{
         require(round<=9);
         require(bitmask_check(account, 1024) == false); // banned == false
 
-        if(accounts[account].lastEpoch < epoch){
+        if(epoch > 1 && accounts[account].lastEpoch < epoch){
             uint entire = accounts[account].balance/100000000;
             accounts[account].balance = entire*100000000;
             return accounts[account].balance;
