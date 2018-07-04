@@ -608,7 +608,7 @@ contract Redenom is ERC20Interface, Owned{
     }
 
 
-    function actual_ballance(address user) public constant returns(uint actual_balance){
+    function actual_balance(address user) public constant returns(uint actual_balance){
         if(epoch > 1 && accounts[user].lastEpoch < epoch){
             return (accounts[user].balance/100000000)*100000000;
         }else{
