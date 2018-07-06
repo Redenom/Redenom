@@ -239,7 +239,7 @@ contract Redenom is ERC20Interface, Owned{
 
     // Add prop. with id: _id
     function addProject(uint _id) public onlyAdmin {
-        require(votingActive == false);
+        require(votingActive == true);
         projects.push(Project({
             id: _id,
             votesWeight: 0,
