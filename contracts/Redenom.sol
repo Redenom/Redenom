@@ -310,7 +310,7 @@ contract Redenom is ERC20Interface, Owned{
 
     // Activates voting
     // Clears projects
-    function enableVoting(uint[] proj_ids) public onlyAdmin returns(uint ballotId){ 
+    function enableVoting() public onlyAdmin returns(uint ballotId){ 
         require(votingActive == false);
         require(frozen == false);
 
@@ -318,13 +318,6 @@ contract Redenom is ERC20Interface, Owned{
         votingActive = true;
         delete projects;
 
-        for(uint p = 0; p < proj_ids.length; p++){
-            projects.push(Project({
-                id: proj_ids[p],
-                votesWeight: 0,
-                active: true
-            }));
-        }
 
         emit VotingOn(curentBallotId);
         return curentBallotId;
