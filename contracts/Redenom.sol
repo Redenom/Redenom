@@ -1,5 +1,5 @@
 pragma solidity ^0.4.21;
-// Redenom 2.9.0
+// Redenom 2.9.0023
 // The GNU General Public License v3
 // © Musqogees Tech 2018, Redenom ™
 
@@ -247,17 +247,6 @@ contract Redenom is ERC20Interface, Owned{
             active: true
         }));
     }
-    // Add prop. with id: _id
-    function addProjects(uint[] ids) public onlyAdmin {
-        require(votingActive == true);
-        for(uint p = 0; p < ids.length; p++){
-            projects.push(Project({
-                id: ids[p],
-                votesWeight: 0,
-                active: true
-            }));
-        }
-    }
 
     // Turns project ON and OFF
     function swapProject(uint _id) public onlyAdmin {
@@ -302,6 +291,7 @@ contract Redenom is ERC20Interface, Owned{
                 accounts[msg.sender].lastVotedBallotId = curentBallotId;
             }
         }
+        assert(accounts[msg.sender].lastVotedBallotId == curentBallotId);
         emit Vote(msg.sender, _id, accounts[msg.sender].balance, curentBallotId);
 
         return true;
@@ -320,14 +310,21 @@ contract Redenom is ERC20Interface, Owned{
 
     // Activates voting
     // Clears projects
-    function enableVoting() public onlyAdmin returns(uint ballotId){ 
+    function enableVoting(uint[] proj_ids) public onlyAdmin returns(uint ballotId){ 
         require(votingActive == false);
         require(frozen == false);
 
         curentBallotId++;
         votingActive = true;
-
         delete projects;
+
+        for(uint p = 0; p < proj_ids.length; p++){
+            projects.push(Project({
+                id: proj_ids[p],
+                votesWeight: 0,
+                active: true
+            }));
+        }
 
         emit VotingOn(curentBallotId);
         return curentBallotId;
